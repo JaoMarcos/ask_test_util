@@ -1,3 +1,5 @@
 /venv/
 /ask_test_util.egg-info/
 /build/
+/dist/
+/.pypirc
