@@ -1,4 +1,5 @@
 import errno
+import hashlib
 import json
 import os
 import time
@@ -9,9 +10,11 @@ from ask_sdk_core.skill import CustomSkill
 from ask_sdk_core.view_resolvers import TemplateFactory
 from ask_sdk_model import RequestEnvelope, ResponseEnvelope
 from ask_sdk_model.services import ServiceClientFactory, ApiConfiguration
+from ask_sdk_model_runtime import ApiResponse
 from ask_sdk_runtime.exceptions import AskSdkException
 from ask_smapi_model.v1.skill.simulations.device import Device
 from ask_smapi_model.v1.skill.simulations.input import Input
+from ask_smapi_model.v1.skill.simulations.session import Session
 from ask_smapi_model.v1.skill.simulations.simulations_api_request import SimulationsApiRequest
 from ask_smapi_sdk import StandardSmapiClientBuilder
 
@@ -38,7 +41,7 @@ class SkillTester:
         self.skill = CustomSkill(skill_configuration=sb.skill_configuration)
         s = self.smapi_client.get_skill_status_v1(self.skill_id)
         self.tag = s.to_dict()['interaction_model'][location]['e_tag']
-        self.request_folder = request_folder + "/" + self.tag + "/"
+        self.request_folder = request_folder + "/"+skill_id.replace('.','')+ '/' + location + "/"
 
         try:
             os.makedirs(os.path.dirname(self.request_folder), exist_ok=True)
@@ -47,21 +50,28 @@ class SkillTester:
                 raise
 
     def check_if_request_exist(self, input_text, session, prefix=""):
-        h = "{}_{}_{}".format(prefix, hash(input_text), hash(str(session)))
-        file_name = "{}/{}.json".format(self.request_folder, h)
+        text = "{}_{}_{}".format(prefix, input_text, str(session))
+
+        m = hashlib.md5(text.encode('UTF-8'))
+        key = m.hexdigest()
+        file_name = "{}/{}.json".format(self.request_folder, key)
         if os.path.isfile(file_name):
             with open(file_name) as file:
                 return json.load(file)
         else:
             return None
 
-    def save_request(self, input_text, session, request_data, prefix=""):
-        h = "{}_{}_{}".format(prefix, hash(input_text), hash(str(session)))
-        file_name = "{}/{}.json".format(self.request_folder, h)
+    def save_request(self, input_text, session, request_data: ApiResponse , prefix=""):
+        text = "{}_{}_{}".format(prefix, input_text, str(session))
+
+        m = hashlib.md5(text.encode('UTF-8'))
+        key = m.hexdigest()
+        file_name = "{}/{}.json".format(self.request_folder, key)
         with open(file_name, 'w') as file:
-            json.dump(request_data, file, indent=2)
+            json.dump(request_data.body.to_dict(), file, indent=2)
 
     def create_request(self, input_text, session=None):
+
         return SimulationsApiRequest(Input(input_text), Device(self.default_location), None)
 
     def get_response(self, input_text, session, sb, prefix=""):
@@ -79,11 +89,12 @@ class SkillTester:
         if data != None:
             request_data = data
         else:
-            request_data = self.simulate_request(input_text, session).to_dict()
+            request_data = self.simulate_request(input_text, session)
             self.save_request(input_text, session, request_data, prefix)
+            request_data = request_data.body.to_dict()
 
         try:
-            event = request_data['result']['skill_execution_info']['invocation_request']['body']
+            event = request_data ['result']['skill_execution_info']['invocation_request']['body']
             if session is not None:
                 event['session'] = session
         except Exception as e:
@@ -103,11 +114,11 @@ class SkillTester:
         for _ in range(3):
             time.sleep(c)
             c+=1
-            result = self.smapi_client.get_skill_simulation_v1(self.skill_id, skill_simulation.id,
+            result = self.smapi_client.get_skill_simulation_v1(self.skill_id, skill_simulation.body.id,
                                                                full_response=True)
-            if result.to_dict()['status'] == "SUCCESSFUL":
+            if result.body.status == "SUCCESSFUL":
                 break
-        if result.to_dict()['status'] != "SUCCESSFUL":
+        if result.body.status != "SUCCESSFUL":
             print("ERROR")
         return result
 

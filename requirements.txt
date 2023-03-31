@@ -1,3 +1,6 @@
 ask_sdk_core
 ask_smapi_model
 ask_smapi_sdk
+ask_sdk
+python-dotenv
+pytest==7.2.1

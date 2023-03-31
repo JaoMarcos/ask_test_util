@@ -9,6 +9,12 @@ readme = "README.md"
 license = {file = "LICENSE"}
 classifiers = ["License :: OSI Approved :: MIT License"]
 dynamic = ["version", "description"]
+dependencies = [
+"ask_sdk_core==1.18.0",
+"ask_smapi_model==1.19.0",
+"ask_smapi_sdk==1.0.0"
+]
+
 
 [project.urls]
 Home = "https://github.com/JaoMarcos/ask_test_util"
